@@ -1,41 +1,88 @@
 import * as XLSX from "xlsx";
-// Importação direta do build compatível com Node.js (ESM)
+
+// --- POLYFILLS PARA AMBIENTE SERVERLESS (VERCEL) ---
+// O pdfjs-dist precisa dessas classes globais para funcionar no Node.js
+if (typeof Promise.withResolvers === "undefined") {
+  if (typeof window !== "undefined") {
+    // @ts-ignore
+    window.Promise.withResolvers = function () {
+      let resolve, reject;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  } else {
+    // @ts-ignore
+    global.Promise.withResolvers = function () {
+      let resolve, reject;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  }
+}
+
+// Mock minimalista do DOMMatrix para evitar ReferenceError
+if (typeof global.DOMMatrix === "undefined") {
+  // @ts-ignore
+  global.DOMMatrix = class DOMMatrix {
+    constructor() {
+      // @ts-ignore
+      this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
+    }
+    // Métodos stubs para evitar crash
+    translate() { return this; }
+    scale() { return this; }
+    rotate() { return this; }
+    multiply() { return this; }
+    transformPoint(p: any) { return p; }
+  };
+}
+// ---------------------------------------------------
+
+// Importação dinâmica para garantir que os polyfills rodem antes
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export async function parsePDF(buffer: Buffer): Promise<string> {
   try {
-    // O pdfjs-dist trabalha com Uint8Array, não Buffer do Node diretamente
+    // Converte Buffer do Node para Uint8Array (formato do pdfjs)
     const uint8Array = new Uint8Array(buffer);
 
-    // Carrega o documento usando a engine da Mozilla
+    // Carrega o documento
     const loadingTask = getDocument({
       data: uint8Array,
-      // Desativa recursos de fonte que exigem DOM/Canvas
+      // Desativa funcionalidades que exigem Canvas/DOM pesado
       useSystemFonts: true,
       disableFontFace: true,
+      verbosity: 0, // Silencia avisos no log
     });
 
     const pdf = await loadingTask.promise;
     let fullText = "";
 
-    // Itera por todas as páginas para extrair o texto
+    // Extrai texto página por página
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       
-      // textContent.items contém fragmentos de texto. Juntamos com espaço.
+      // Junta os fragmentos de texto
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(" ");
 
-      // Adiciona marcador de página para ajudar a IA a entender a estrutura
-      fullText += `\n--- Página ${i} ---\n${pageText}`;
+      // Limpa espaços excessivos e adiciona marcador
+      const cleanPageText = pageText.replace(/\s+/g, " ").trim();
+      fullText += `\n--- Página ${i} ---\n${cleanPageText}`;
     }
 
     return fullText;
   } catch (error) {
-    console.error("Erro no parser PDF (pdfjs-dist):", error);
-    throw new Error("Falha ao processar o arquivo PDF. O arquivo pode estar corrompido ou protegido.");
+    console.error("Erro no parser PDF (Vercel):", error);
+    throw new Error("Falha ao processar o arquivo PDF. Tente um arquivo diferente ou em formato Excel.");
   }
 }
 
