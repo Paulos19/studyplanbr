@@ -26,7 +26,7 @@ if (typeof Promise.withResolvers === "undefined") {
   }
 }
 
-// Mock minimalista do DOMMatrix para evitar ReferenceError
+// Mock minimalista do DOMMatrix para evitar ReferenceError na Vercel
 if (typeof global.DOMMatrix === "undefined") {
   // @ts-ignore
   global.DOMMatrix = class DOMMatrix {
@@ -34,7 +34,7 @@ if (typeof global.DOMMatrix === "undefined") {
       // @ts-ignore
       this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
     }
-    // Métodos stubs para evitar crash
+    // Métodos stubs para evitar crash durante a leitura de fontes/transformações
     translate() { return this; }
     scale() { return this; }
     rotate() { return this; }
@@ -44,12 +44,12 @@ if (typeof global.DOMMatrix === "undefined") {
 }
 // ---------------------------------------------------
 
-// Importação dinâmica para garantir que os polyfills rodem antes
+// Importação dinâmica para garantir que os polyfills rodem ANTES da biblioteca carregar
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export async function parsePDF(buffer: Buffer): Promise<string> {
   try {
-    // Converte Buffer do Node para Uint8Array (formato do pdfjs)
+    // Converte Buffer do Node para Uint8Array (formato esperado pelo pdfjs)
     const uint8Array = new Uint8Array(buffer);
 
     // Carrega o documento
@@ -71,10 +71,11 @@ export async function parsePDF(buffer: Buffer): Promise<string> {
       
       // Junta os fragmentos de texto
       const pageText = textContent.items
+        // @ts-ignore - Tipagem do pdfjs às vezes falha no item.str
         .map((item: any) => item.str)
         .join(" ");
 
-      // Limpa espaços excessivos e adiciona marcador
+      // Limpa espaços excessivos e adiciona marcador de página
       const cleanPageText = pageText.replace(/\s+/g, " ").trim();
       fullText += `\n--- Página ${i} ---\n${cleanPageText}`;
     }
@@ -93,6 +94,7 @@ export async function parseExcel(buffer: Buffer): Promise<string> {
 
     workbook.SheetNames.forEach((sheetName) => {
       const sheet = workbook.Sheets[sheetName];
+      // sheet_to_txt gera uma representação CSV/Texto simples da aba
       const sheetText = XLSX.utils.sheet_to_txt(sheet);
       text += `\n--- Aba: ${sheetName} ---\n${sheetText}`;
     });
