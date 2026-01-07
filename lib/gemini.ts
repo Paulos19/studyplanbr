@@ -8,7 +8,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Usando o modelo solicitado na versão flash para velocidade
 export const model = genAI.getGenerativeModel({ 
-  model: "gemini-2.5-flash",
+  model: "gemini-2.5-pro",
   generationConfig: {
     temperature: 0.2,
     maxOutputTokens: 8192,

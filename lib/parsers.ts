@@ -1,26 +1,41 @@
 import * as XLSX from "xlsx";
-
-// 1. Usamos 'require' para evitar que o TypeScript force uma conversão estrita de ESM
-// 2. O 'no-var-requires' é desativado apenas nesta linha
-/* eslint-disable @typescript-eslint/no-var-requires */
-const pdfLib = require("pdf-parse");
+// Importação direta do build compatível com Node.js (ESM)
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export async function parsePDF(buffer: Buffer): Promise<string> {
   try {
-    // 3. Verificação de Segurança (Bulletproof): 
-    // Dependendo do ambiente (Dev vs Build), o export pode vir direto OU dentro de 'default'.
-    // Esta lógica garante que pegamos a função correta independentemente do bundler.
-    const pdfParse = typeof pdfLib === 'function' ? pdfLib : pdfLib.default;
+    // O pdfjs-dist trabalha com Uint8Array, não Buffer do Node diretamente
+    const uint8Array = new Uint8Array(buffer);
 
-    if (typeof pdfParse !== 'function') {
-        throw new Error("A biblioteca pdf-parse não foi inicializada corretamente. Verifique o next.config.ts.");
+    // Carrega o documento usando a engine da Mozilla
+    const loadingTask = getDocument({
+      data: uint8Array,
+      // Desativa recursos de fonte que exigem DOM/Canvas
+      useSystemFonts: true,
+      disableFontFace: true,
+    });
+
+    const pdf = await loadingTask.promise;
+    let fullText = "";
+
+    // Itera por todas as páginas para extrair o texto
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      
+      // textContent.items contém fragmentos de texto. Juntamos com espaço.
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+
+      // Adiciona marcador de página para ajudar a IA a entender a estrutura
+      fullText += `\n--- Página ${i} ---\n${pageText}`;
     }
 
-    const data = await pdfParse(buffer);
-    return data.text;
+    return fullText;
   } catch (error) {
-    console.error("Erro detalhado no Parser PDF:", error);
-    throw new Error("Falha interna ao processar o PDF. Verifique os logs do servidor.");
+    console.error("Erro no parser PDF (pdfjs-dist):", error);
+    throw new Error("Falha ao processar o arquivo PDF. O arquivo pode estar corrompido ou protegido.");
   }
 }
 
@@ -32,7 +47,6 @@ export async function parseExcel(buffer: Buffer): Promise<string> {
     workbook.SheetNames.forEach((sheetName) => {
       const sheet = workbook.Sheets[sheetName];
       const sheetText = XLSX.utils.sheet_to_txt(sheet);
-      // Adiciona cabeçalho para ajudar a IA a entender a separação
       text += `\n--- Aba: ${sheetName} ---\n${sheetText}`;
     });
 

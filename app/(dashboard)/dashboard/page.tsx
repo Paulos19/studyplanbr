@@ -1,48 +1,46 @@
-"use client";
+import { Suspense } from "react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { MyPlansList } from "@/components/dashboard/my-plans-list";
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { useState } from "react";
-import { FileUpload } from "@/components/dashboard/file-upload";
-import { PlanViewer } from "@/components/dashboard/plan-viewer";
-import { StudyPlanResponse } from "@/services/ai-planner";
-import { motion, AnimatePresence } from "framer-motion";
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
 
-export default function DashboardPage() {
-  const [plan, setPlan] = useState<StudyPlanResponse | null>(null);
-
-  // Função para receber o plano gerado pelo componente de upload
-  const handlePlanGenerated = (newPlan: StudyPlanResponse) => {
-    setPlan(newPlan);
-  };
+  if (!session) {
+    redirect("/login");
+  }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-          Gerador de Plano de Estudos
-        </h1>
-        <p className="text-zinc-500 dark:text-zinc-400">
-          Faça upload do seu edital (PDF ou Excel) e deixe nossa IA organizar sua rotina.
-        </p>
-      </div>
+    <DashboardView userName={session.user?.name || "Estudante"}>
+      <Suspense fallback={<PlansGridSkeleton />}>
+        <MyPlansList />
+      </Suspense>
+    </DashboardView>
+  );
+}
 
-      {/* Área de Upload - Sempre visível se não houver plano, ou colapsada? 
-          Vamos deixar visível para permitir gerar novo plano. */}
-      <div className="grid gap-8">
-        <FileUpload onPlanGenerated={handlePlanGenerated} />
-
-        <AnimatePresence mode="wait">
-          {plan && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              <PlanViewer initialPlan={plan} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+function PlansGridSkeleton() {
+  return (
+    <>
+      {[1, 2].map((i) => (
+        <div key={i} className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-4">
+          <div className="flex justify-between items-start">
+             <Skeleton className="h-6 w-3/4 rounded-md" />
+             <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-1/2" />
+          <div className="space-y-2 pt-6">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-10" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <Skeleton className="h-2 w-full rounded-full" />
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
