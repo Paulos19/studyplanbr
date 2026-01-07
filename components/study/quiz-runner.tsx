@@ -7,7 +7,6 @@ import {
   XCircle, 
   ArrowRight, 
   ArrowLeft, 
-  RotateCcw, 
   Flag,
   Lightbulb
 } from "lucide-react";
@@ -29,7 +28,7 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
-  const [answersLog, setAnswersLog] = useState<any[]>([]); // Para relatório final
+  const [answersLog, setAnswersLog] = useState<any[]>([]); 
 
   const question = quiz.questions[currentIdx];
   const progress = ((currentIdx) / quiz.questions.length) * 100;
@@ -51,11 +50,10 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
         particleCount: 50,
         spread: 60,
         origin: { y: 0.8 },
-        colors: ['#22c55e', '#ffffff'] // Verde e branco
+        colors: ['#22c55e', '#ffffff']
       });
     }
 
-    // Salva log para o final
     setAnswersLog(prev => [...prev, {
       questionIdx: currentIdx,
       selected: selectedOption,
@@ -71,52 +69,56 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
       setIsAnswered(false);
     } else {
       setShowResults(true);
-      if (score === quiz.questions.length) {
-        confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
+      if (score > quiz.questions.length / 2) {
+        confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
       }
     }
   };
 
   // --- TELA DE RESULTADOS ---
   if (showResults) {
-    const percentage = Math.round((score / quiz.questions.length) * 100);
-    
     return (
-      <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="text-center space-y-4">
+      <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+        <div className="text-center space-y-4 pt-4">
           <div className="inline-flex items-center justify-center p-4 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-xl mb-4">
             <Flag size={48} className="text-white" />
           </div>
-          <h2 className="text-4xl font-bold text-zinc-900 dark:text-white">Simulado Finalizado!</h2>
-          <p className="text-xl text-zinc-500">
+          <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-white">Simulado Finalizado!</h2>
+          <p className="text-lg md:text-xl text-zinc-500">
             Você acertou <span className="font-bold text-blue-600">{score}</span> de {quiz.questions.length} questões.
           </p>
         </div>
 
-        <div className="grid gap-4 max-w-2xl mx-auto">
+        <div className="grid gap-4 max-w-3xl mx-auto">
           {quiz.questions.map((q: any, idx: number) => {
             const log = answersLog.find(l => l.questionIdx === idx);
             if (!log) return null;
 
             return (
-              <Card key={q.id} className={cn("border-l-4", log.isCorrect ? "border-l-green-500" : "border-l-red-500")}>
+              <Card key={q.id} className={cn("border-l-4 overflow-hidden", log.isCorrect ? "border-l-green-500" : "border-l-red-500")}>
                 <CardContent className="p-6 space-y-3">
                   <div className="flex items-start gap-3">
-                    {log.isCorrect ? <CheckCircle2 className="text-green-500 shrink-0" /> : <XCircle className="text-red-500 shrink-0" />}
-                    <div>
-                      <p className="font-medium text-zinc-800 dark:text-zinc-200">{q.statement}</p>
-                      {!log.isCorrect && (
-                        <p className="text-sm text-red-500 mt-2">
-                          Você marcou: {q.options[log.selected]}
-                        </p>
-                      )}
-                      <p className="text-sm text-green-600 font-medium mt-1">
-                        Correta: {q.options[q.correctAnswer]}
-                      </p>
+                    {log.isCorrect ? (
+                      <CheckCircle2 className="text-green-500 shrink-0 mt-1" />
+                    ) : (
+                      <XCircle className="text-red-500 shrink-0 mt-1" />
+                    )}
+                    <div className="space-y-2 w-full">
+                      <p className="font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed">{q.statement}</p>
+                      
+                      <div className="grid gap-2 text-sm mt-2">
+                        {!log.isCorrect && (
+                          <div className="p-2 rounded bg-red-50 dark:bg-red-900/10 text-red-800 dark:text-red-200 border border-red-100 dark:border-red-900/20">
+                            <span className="font-bold">Sua resposta:</span> {q.options[log.selected]}
+                          </div>
+                        )}
+                        <div className="p-2 rounded bg-green-50 dark:bg-green-900/10 text-green-800 dark:text-green-200 border border-green-100 dark:border-green-900/20">
+                          <span className="font-bold">Correta:</span> {q.options[q.correctAnswer]}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
-                  {/* Explicação Sempre Visível no Final */}
                   <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg mt-2 text-sm text-blue-800 dark:text-blue-200">
                     <div className="flex items-center gap-2 mb-1 font-bold">
                       <Lightbulb size={14} /> Explicação:
@@ -129,11 +131,13 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
           })}
         </div>
 
-        <div className="flex justify-center gap-4 pt-4">
-           <Link href={backUrl}>
-             <Button variant="outline" size="lg">Voltar ao Banco</Button>
+        <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
+           <Link href={backUrl} className="w-full sm:w-auto">
+             <Button variant="outline" size="lg" className="w-full">Voltar ao Banco</Button>
            </Link>
-           <Button onClick={() => window.location.reload()} size="lg">Refazer Simulado</Button>
+           <Button onClick={() => window.location.reload()} size="lg" className="w-full sm:w-auto">
+             Refazer Simulado
+           </Button>
         </div>
       </div>
     );
@@ -141,10 +145,10 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
 
   // --- MODO DE EXECUÇÃO (QUESTIONÁRIO) ---
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-0">
       {/* Header com Progresso */}
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" size="icon" onClick={() => setShowResults(true)} title="Desistir">
+      <div className="flex items-center gap-4 mb-4 md:mb-8">
+        <Button variant="ghost" size="icon" onClick={() => setShowResults(true)} title="Desistir/Sair">
           <ArrowLeft size={20} />
         </Button>
         <div className="flex-1 space-y-2">
@@ -166,8 +170,8 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
           transition={{ duration: 0.2 }}
         >
           <Card className="border-0 shadow-lg bg-white dark:bg-zinc-900 overflow-hidden">
-            <div className="p-8">
-              <h3 className="text-xl font-medium leading-relaxed text-zinc-900 dark:text-white mb-8">
+            <div className="p-6 md:p-8">
+              <h3 className="text-lg md:text-xl font-medium leading-relaxed text-zinc-900 dark:text-white mb-6 md:mb-8">
                 {question.statement}
               </h3>
 
@@ -179,10 +183,10 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
                   if (isAnswered) {
                     if (idx === question.correctAnswer) {
                       style = "bg-green-100 border-green-500 text-green-800 dark:bg-green-900/30 dark:border-green-500 dark:text-green-200";
-                      icon = <CheckCircle2 size={20} className="text-green-600" />;
+                      icon = <CheckCircle2 size={20} className="text-green-600 shrink-0" />;
                     } else if (idx === selectedOption) {
                       style = "bg-red-100 border-red-500 text-red-800 dark:bg-red-900/30 dark:border-red-500 dark:text-red-200";
-                      icon = <XCircle size={20} className="text-red-600" />;
+                      icon = <XCircle size={20} className="text-red-600 shrink-0" />;
                     } else {
                       style = "opacity-50 grayscale";
                     }
@@ -195,11 +199,11 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
                       key={idx}
                       onClick={() => handleSelect(idx)}
                       className={cn(
-                        "relative flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-200",
+                        "relative flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 text-sm md:text-base",
                         style
                       )}
                     >
-                      <div className="flex-1 font-medium">{option}</div>
+                      <div className="flex-1 font-medium mr-2">{option}</div>
                       {icon}
                     </div>
                   );
@@ -207,8 +211,8 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
               </div>
             </div>
 
-            {/* Footer com Feedback e Botão */}
-            <div className="p-6 bg-zinc-50 dark:bg-black/20 border-t border-zinc-100 dark:border-zinc-800">
+            {/* Footer com Feedback e Botões Responsivos */}
+            <div className="p-4 md:p-6 bg-zinc-50 dark:bg-black/20 border-t border-zinc-100 dark:border-zinc-800">
               {isAnswered ? (
                 <div className="space-y-4 animate-in slide-in-from-bottom-2 fade-in">
                   <div className={cn(
@@ -225,7 +229,7 @@ export function QuizRunner({ quiz, backUrl }: QuizRunnerProps) {
                   </div>
                   
                   <div className="flex justify-end">
-                    <Button onClick={handleNext} size="lg" className="bg-zinc-900 text-white hover:bg-zinc-800">
+                    <Button onClick={handleNext} size="lg" className="w-full md:w-auto bg-zinc-900 text-white hover:bg-zinc-800">
                       {currentIdx === quiz.questions.length - 1 ? "Ver Resultado Final" : "Próxima Questão"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
