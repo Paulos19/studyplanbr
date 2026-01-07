@@ -52,30 +52,37 @@ export async function createQuizAction(content: string, difficulty: string, plan
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error("Não autorizado");
 
-  // 1. Gera as questões na IA
-  const quizData = await generateQuizFromContent(content, difficulty as any);
+  try {
+    // 1. Gera as questões na IA
+    const quizData = await generateQuizFromContent(content, difficulty as any);
 
-  // 2. Salva no Banco
-  const savedQuiz = await prisma.quiz.create({
-    data: {
-      userId: session.user.id as string,
-      planId: planId,
-      topic: quizData.topic,
-      total: quizData.questions.length,
-      questions: {
-        create: quizData.questions.map((q) => ({
-          statement: q.statement,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation,
-        })),
+    // 2. Salva no Banco
+    const savedQuiz = await prisma.quiz.create({
+      data: {
+        userId: session.user.id as string,
+        planId: planId,
+        topic: quizData.topic,
+        total: quizData.questions.length,
+        questions: {
+          create: quizData.questions.map((q) => ({
+            statement: q.statement,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation,
+          })),
+        },
       },
-    },
-    include: { questions: true },
-  });
+      include: { questions: true },
+    });
 
-  return savedQuiz;
+    return savedQuiz;
+  } catch (error) {
+    console.error("Erro ao criar quiz:", error);
+    throw new Error("Falha ao gerar o simulado. Verifique se o texto é válido.");
+  }
 }
+
+// --- Ações de Dashboard (Metadata) ---
 
 interface DashboardMetadata {
   quote: string;
@@ -87,14 +94,29 @@ interface DashboardMetadata {
 }
 
 export async function getDashboardMetadataAction(lat: number, lon: number): Promise<DashboardMetadata> {
+  // Definição de Fallbacks (Valores padrão para não quebrar a UI)
+  const fallbackQuote = "A disciplina é a ponte entre metas e realizações.";
+  const fallbackWeather = { temperature: 25, conditionCode: 0, isDay: true };
+
   // 1. Busca Frase Motivacional no Gemini
   const quotePromise = (async () => {
     try {
+      // Verificação de Segurança: Se não tem chave, usa fallback direto sem tentar chamar a API
+      if (!process.env.GEMINI_API_KEY) {
+        console.warn("GEMINI_API_KEY não configurada. Usando frase de fallback.");
+        return fallbackQuote;
+      }
+
       const prompt = "Gere uma frase motivacional curta (max 15 palavras), impactante e estoica para um estudante de alto rendimento. Retorne APENAS o texto da frase, sem aspas.";
+      
       const result = await model.generateContent(prompt);
-      return result.response.text().trim();
+      const text = result.response.text().trim();
+      
+      // Remove aspas se a IA colocar acidentalmente
+      return text.replace(/^"|"$/g, '') || fallbackQuote;
     } catch (e) {
-      return "A disciplina é a ponte entre metas e realizações."; // Fallback
+      console.error("Erro ao gerar frase motivacional:", e);
+      return fallbackQuote;
     }
   })();
 
@@ -105,17 +127,25 @@ export async function getDashboardMetadataAction(lat: number, lon: number): Prom
         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`,
         { next: { revalidate: 1800 } } // Cache de 30 min
       );
+      
+      if (!res.ok) {
+        throw new Error(`Open-Meteo API Error: ${res.status}`);
+      }
+
       const data = await res.json();
+      
       return {
         temperature: data.current_weather.temperature,
         conditionCode: data.current_weather.weathercode,
         isDay: data.current_weather.is_day === 1
       };
     } catch (e) {
-      return { temperature: 25, conditionCode: 0, isDay: true }; // Fallback
+      console.error("Erro ao buscar clima:", e);
+      return fallbackWeather;
     }
   })();
 
+  // Executa em paralelo e retorna
   const [quote, weather] = await Promise.all([quotePromise, weatherPromise]);
 
   return { quote, weather };
